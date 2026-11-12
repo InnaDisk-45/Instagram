@@ -182,7 +182,15 @@ def publish_telegram(post):
 # ---------------- main ----------------
 
 def main():
-    only = sys.argv[1] if len(sys.argv) > 1 else "all"  # all | instagram | telegram
+    raw = (sys.argv[1] if len(sys.argv) > 1 else "all").strip().lower()
+    aliases = {
+        "": "all", "all": "all", "все": "all", "всё": "all",
+        "telegram": "telegram", "телеграм": "telegram", "телеграмм": "telegram", "tg": "telegram", "тг": "telegram",
+        "instagram": "instagram", "инстаграм": "instagram", "инстаграмм": "instagram", "ig": "instagram",
+    }
+    if raw not in aliases:
+        sys.exit(f"Не понимаю, куда публиковать: «{raw}». Напишите all, telegram или instagram.")
+    only = aliases[raw]
     state = load_state()
     errors = []
     for network, func in (("instagram", publish_instagram), ("telegram", publish_telegram)):
