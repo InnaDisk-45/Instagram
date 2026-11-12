@@ -205,13 +205,18 @@ def which_network(raw):
     # набрано латиницей в русской раскладке («еудупкфь» = telegram)
     ru, en = "йцукенгшщзхъфывапролджэячсмитьбю", "qwertyuiop[]asdfghjkl;'zxcvbnm,."
     w_lat = "".join(en[ru.index(c)] if c in ru else c for c in w)
+    # слово ищется в любом месте поля: «alltelegram» (дописали к all) = telegram
     for cand in (w, w_lat):
+        tg = any(k in cand for k in ("tel", "тел", "tg", "тг"))
+        ig = any(k in cand for k in ("ins", "инс", "ig"))
+        if tg and ig:
+            return "all"
+        if tg:
+            return "telegram"
+        if ig:
+            return "instagram"
         if cand in ("", "all", "все", "всё", "both", "оба"):
             return "all"
-        if cand.startswith(("tel", "тел", "tg", "тг")):
-            return "telegram"
-        if cand.startswith(("ins", "инс", "ig")):
-            return "instagram"
     return None
 
 
