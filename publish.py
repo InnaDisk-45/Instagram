@@ -199,19 +199,33 @@ def hide_secrets(text):
     return re.sub(r"bot\d+:[\w-]+", "bot***", text)
 
 
+def which_network(raw):
+    """Понимает слово из поля «network» в любом написании; None — если непонятно."""
+    w = re.sub(r"[^a-zа-яё]", "", raw.lower())
+    # набрано латиницей в русской раскладке («еудупкфь» = telegram)
+    ru, en = "йцукенгшщзхъфывапролджэячсмитьбю", "qwertyuiop[]asdfghjkl;'zxcvbnm,."
+    w_lat = "".join(en[ru.index(c)] if c in ru else c for c in w)
+    for cand in (w, w_lat):
+        if cand in ("", "all", "все", "всё", "both", "оба"):
+            return "all"
+        if cand.startswith(("tel", "тел", "tg", "тг")):
+            return "telegram"
+        if cand.startswith(("ins", "инс", "ig")):
+            return "instagram"
+    return None
+
+
 def main():
-    raw = (sys.argv[1] if len(sys.argv) > 1 else "all").strip().lower()
-    aliases = {
-        "": "all", "all": "all", "все": "all", "всё": "all",
-        "telegram": "telegram", "телеграм": "telegram", "телеграмм": "telegram", "tg": "telegram", "тг": "telegram",
-        "instagram": "instagram", "инстаграм": "instagram", "инстаграмм": "instagram", "ig": "instagram",
-    }
-    if raw not in aliases:
-        sys.exit(f"Не понимаю, куда публиковать: «{raw}». Напишите all, telegram или instagram.")
-    only = aliases[raw]
+    raw = sys.argv[1] if len(sys.argv) > 1 else "all"
+    log = [f"поле network: {raw!r}"]
+    only = which_network(raw)
+    if only is None:
+        log.append("ОШИБКА: не понял, куда публиковать. Напишите telegram, instagram или all.")
+        (ROOT / "last_run.txt").write_text(
+            time.strftime("%d.%m.%Y %H:%M UTC\n", time.gmtime()) + "\n".join(log) + "\n", encoding="utf-8")
+        sys.exit(log[-1])
     state = load_state()
     errors = []
-    log = []
     for network, func in (("instagram", publish_instagram), ("telegram", publish_telegram)):
         if only not in ("all", network):
             continue
