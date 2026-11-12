@@ -234,6 +234,11 @@ def main():
     for network, func in (("instagram", publish_instagram), ("telegram", publish_telegram)):
         if only not in ("all", network):
             continue
+        key = "IG_ACCESS_TOKEN" if network == "instagram" else "TG_BOT_TOKEN"
+        if not os.environ.get(key, "").strip():
+            print(f"{network}: ключ {key} ещё не добавлен — пропускаю")
+            log.append(f"{network}: пропущено, ключ ещё не добавлен")
+            continue
         post = next_post(state, network)
         if not post:
             print(f"{network}: все посты уже опубликованы")
