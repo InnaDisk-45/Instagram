@@ -161,8 +161,17 @@ def tg_call(method, files=None, **data):
     return r.json()
 
 
+def tg_chat():
+    """Принимает канал в любом виде: @innadisk, innadisk, https://t.me/innadisk, -100…"""
+    chat = os.environ["TG_CHAT_ID"].strip()
+    chat = re.sub(r"^(https?://)?(www\.)?(t|telegram)\.me/", "", chat).strip("/ ")
+    if not chat.startswith("@") and not re.fullmatch(r"-?\d+", chat):
+        chat = "@" + chat
+    return chat
+
+
 def publish_telegram(post):
-    chat = os.environ["TG_CHAT_ID"]
+    chat = tg_chat()
     folder_name = read(post, "source_folder.txt")
     title = folder_name.split(" — ", 1)[1] if " — " in folder_name else ""
     part1 = tg_format(read(post, "telegram_1.txt"), title)
@@ -181,6 +190,15 @@ def publish_telegram(post):
 
 # ---------------- main ----------------
 
+def hide_secrets(text):
+    """Убирает ключи из текста ошибки: он сохраняется в открытый файл last_run.txt."""
+    for name in ("IG_ACCESS_TOKEN", "TG_BOT_TOKEN"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            text = text.replace(value, "***")
+    return re.sub(r"bot\d+:[\w-]+", "bot***", text)
+
+
 def main():
     raw = (sys.argv[1] if len(sys.argv) > 1 else "all").strip().lower()
     aliases = {
@@ -193,6 +211,7 @@ def main():
     only = aliases[raw]
     state = load_state()
     errors = []
+    log = []
     for network, func in (("instagram", publish_instagram), ("telegram", publish_telegram)):
         if only not in ("all", network):
             continue
@@ -206,8 +225,14 @@ def main():
             state.setdefault(network, []).append(post)
             save_state(state)
         except Exception as e:  # noqa: BLE001
-            print(f"  ОШИБКА: {e}")
+            msg = hide_secrets(str(e))
+            print(f"  ОШИБКА: {msg}")
+            log.append(f"{network}, пост {post}: ОШИБКА {msg}")
             errors.append(network)
+        else:
+            log.append(f"{network}, пост {post}: опубликовано")
+    (ROOT / "last_run.txt").write_text(
+        time.strftime("%d.%m.%Y %H:%M UTC\n", time.gmtime()) + "\n".join(log) + "\n", encoding="utf-8")
     if errors:
         sys.exit(f"Не удалось опубликовать: {', '.join(errors)}")
 
