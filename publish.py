@@ -230,6 +230,12 @@ def main():
             time.strftime("%d.%m.%Y %H:%M UTC\n", time.gmtime()) + "\n".join(log) + "\n", encoding="utf-8")
         sys.exit(log[-1])
     state = load_state()
+    # Запуск по расписанию публикует не больше одного поста в день в каждую сеть
+    # (запасной запуск и запоздавший запуск GitHub не дадут второй пост).
+    # Ручной запуск кнопкой «Run workflow» публикует всегда.
+    by_schedule = os.environ.get("GITHUB_EVENT_NAME") == "schedule"
+    today = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 3 * 3600))  # дата по Москве
+    last_date = state.setdefault("last_date", {})
     errors = []
     for network, func in (("instagram", publish_instagram), ("telegram", publish_telegram)):
         if only not in ("all", network):
@@ -239,6 +245,10 @@ def main():
             print(f"{network}: ключ {key} ещё не добавлен — пропускаю")
             log.append(f"{network}: пропущено, ключ ещё не добавлен")
             continue
+        if by_schedule and last_date.get(network) == today:
+            print(f"{network}: сегодня пост уже вышел — пропускаю")
+            log.append(f"{network}: пропущено, сегодня пост уже вышел")
+            continue
         post = next_post(state, network)
         if not post:
             print(f"{network}: все посты уже опубликованы")
@@ -247,6 +257,7 @@ def main():
         try:
             func(post)
             state.setdefault(network, []).append(post)
+            last_date[network] = today
             save_state(state)
         except Exception as e:  # noqa: BLE001
             msg = hide_secrets(str(e))
